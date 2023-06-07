@@ -5,7 +5,12 @@ import tempfile
 import os
 import wandb
 import hydra
+
+import logging
+from pathlib import Path
 from omegaconf import DictConfig
+
+logger = logging.getLogger(__name__)
 
 _steps = [
     "download",
@@ -16,7 +21,7 @@ _steps = [
     # NOTE: We do not include this in the steps so it is not run by mistake.
     # You first need to promote a model export to "prod" before you can run this,
     # then you need to run this step explicitly
-#    "test_regression_model"
+    # "test_regression_model"
 ]
 
 
@@ -50,46 +55,93 @@ def go(config: DictConfig):
             )
 
         if "basic_cleaning" in active_steps:
-            ##################
-            # Implement here #
-            ##################
-            pass
+            logger.info("Step: Basic Cleaning")
+            _ = mlflow.run(
+                os.path.join(hydra.utils.get_original_cwd(), "src", "basic_cleaning"),
+                "main",
+                parameters={
+                    "input_artifact": "sample.csv:latest",
+                    "output_artifact": "clean_sample.csv",
+                    "output_type": "clean_sample",
+                    "output_description": "dataset with outliers and"
+                                          " null values removed",
+                    "min_price": config["etl"]["min_price"],
+                    "max_price": config["etl"]["max_price"]
+                },
+            )
 
         if "data_check" in active_steps:
-            ##################
-            # Implement here #
-            ##################
-            pass
+            logger.info("Step: Data Check")
+            _ = mlflow.run(
+                os.path.join(hydra.utils.get_original_cwd(), "src", "data_check"),
+                "main",
+                parameters={
+                    "csv": "clean_sample.csv:latest",
+                    "ref": "clean_sample.csv:reference",
+                    "kl_threshold": config["data_check"]["kl_threshold"],
+                    "min_price": config["etl"]["min_price"],
+                    "max_price": config["etl"]["max_price"]
+                },
+
+            )
 
         if "data_split" in active_steps:
-            ##################
-            # Implement here #
-            ##################
-            pass
+            logger.info("Step: Data Split")
+            _ = mlflow.run(
+                os.path.join(
+                    hydra.utils.get_original_cwd(),
+                    "components", "train_val_test_split"),
+                "main",
+                parameters={
+                    "input": "clean_sample.csv:latest",
+                    "test_size": config["modeling"]["test_size"],
+                    "random_seed": config["modeling"],
+                    "stratify_by": config["modeling"]["stratify_by"]
+                }
+
+            )
 
         if "train_random_forest" in active_steps:
+            logger.info("Step: Train Random Forest")
 
             # NOTE: we need to serialize the random forest configuration into JSON
             rf_config = os.path.abspath("rf_config.json")
             with open(rf_config, "w+") as fp:
-                json.dump(dict(config["modeling"]["random_forest"].items()), fp)  # DO NOT TOUCH
+                json.dump(dict(config["modeling"]["random_forest"].items()), fp)  # DO NOT TOUCH # noqa
 
-            # NOTE: use the rf_config we just created as the rf_config parameter for the train_random_forest
-            # step
+            # NOTE: use the rf_config we just created as the rf_config parameter
+            # for the train_random_forest step
 
-            ##################
-            # Implement here #
-            ##################
-
-            pass
+            _ = mlflow.run(
+                os.path.join(
+                    hydra.utils.get_original_cwd(),
+                    "components", "train_random_forest"),
+                "main",
+                parameters={
+                    "trainval_artifact": "trainval_data.csv:latest",
+                    "val_size": config["modeling"]["val_Size"],
+                    "random_seed":config["modeling"]["random_seed"],
+                    "stratify_by": config["modeling"]["stratify_by"],
+                    "rf_config": rf_config,
+                    "max_tfidf_features": config["modelings"]["max_tfidf_features"], # noqa
+                    "output_artifact": "random_forest_export"
+                }
+            )
 
         if "test_regression_model" in active_steps:
+            logger.info("Step: Test Regression Model")
 
-            ##################
-            # Implement here #
-            ##################
+            _ = mlflow.run(
+                os.path.join(
+                    hydra.utils.get_original_cwd(),
+                    "components", "test_regression_model"),
+                "main",
+                parameters={
+                    "mlflow_model": "random_forest_export:prod",
+                    "test_dataset": "test_data.csv:latest"
+                }
 
-            pass
+            )
 
 
 if __name__ == "__main__":
