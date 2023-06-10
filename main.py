@@ -113,15 +113,15 @@ def go(config: DictConfig):
             _ = mlflow.run(
                 os.path.join(
                     hydra.utils.get_original_cwd(),
-                    "components", "train_random_forest"),
+                    "src", "train_random_forest"),
                 "main",
                 parameters={
                     "trainval_artifact": "trainval_data.csv:latest",
-                    "val_size": config["modeling"]["val_Size"],
+                    "val_size": config["modeling"]["val_size"],
                     "random_seed":config["modeling"]["random_seed"],
                     "stratify_by": config["modeling"]["stratify_by"],
                     "rf_config": rf_config,
-                    "max_tfidf_features": config["modelings"]["max_tfidf_features"], # noqa
+                    "max_tfidf_features": config["modeling"]["max_tfidf_features"], # noqa
                     "output_artifact": "random_forest_export"
                 }
             )
