@@ -567,3 +567,9 @@ you have trained your new model on the new data.
 ## License
 
 [License](LICENSE.txt)
+
+## Project Links
+
+[GitHub Repository](https://github.com/moicesc/build-ml-pipeline-for-short-term-rental-prices)
+
+[W&B Project](https://wandb.ai/moy-gonzalez/nyc_airbnb/overview)
